@@ -28,7 +28,7 @@ curl -sL https://aws-amplify.github.io/amplify-cli/install | bash && $SHELL
 
 ## Verify installation and version
 amplify --version
-# 9.1.0
+# 10.5.1
 ```
 
 ## Initialize an Amplify Backend
@@ -91,9 +91,9 @@ Your project has been successfully initialized and connected to the cloud!
 
 ![Xcode Add Packages toolbar option](img/xcode-add-packages.png)
 
-2. Enter the Amplify iOS GitHub repo URL (https://github.com/aws-amplify/amplify-ios) into the search bar and hit **Enter**. Wait for the result to load. You'll see the Amplify iOS repository rules for which version of Amplify you want Swift Package Manager to install. Choose the dependency rule **Up to Next Major Version**, as it will use the latest compatible version of the dependency that can be detected from the main branch, then click **Add Package**.
+2. Enter the Amplify Libraries for Swift GitHub repo URL (https://github.com/aws-amplify/amplify-swift) into the search bar and hit **Enter**. Wait for the result to load. You'll see the Amplify Libraries for Swift repository rules for which version of Amplify you want Swift Package Manager to install. Choose the dependency rule **Up to Next Major Version**, as it will use the latest compatible version of the dependency that can be detected from the main branch, then click **Add Package**.
 
-![Amplify iOS repo URL in Add Packages search bar](img/search-for-amplify-repo.png)
+![Amplify Libraries for Swift repo URL in Add Packages search bar](img/search-for-amplify-repo.png)
 
 3. Lastly, choose which of the libraries you want added to your project. For this tutorial, select Amplify, then click **Add Package**.
 
@@ -115,7 +115,7 @@ At runtime, the Amplify libraries require the Amplify configuration files genera
 
     The class initializer takes care of initializing the Amplify librairies.
 
-    Create a new swift text file `Backend.swift`, add it to your Xcode project (**CTRL-N**) and add this code:
+    Create a new Swift text file `Backend.swift`, add it to your Xcode project (**CTRL-N**) and add this code:
 
     ```swift
     import UIKit

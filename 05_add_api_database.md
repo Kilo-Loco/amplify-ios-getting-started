@@ -181,10 +181,10 @@ Let's add 3 methods to call our API: a method to query the Note, a method to cre
     // MARK: API Access
 
     func queryNotes() {
-
-        Amplify.API.query(request: .list(NoteData.self)) { event in
-            switch event {
-            case .success(let result):
+        Task {
+            do {
+                let result = try await Amplify.API.query(request: .list(Transaction.self))
+                
                 switch result {
                 case .success(let notesData):
                     print("Successfully retrieved list of Notes")
@@ -192,7 +192,7 @@ Let's add 3 methods to call our API: a method to query the Note, a method to cre
                     // convert an array of NoteData to an array of Note class instances
                     for n in notesData {
                         let note = Note.init(from: n)
-                        DispatchQueue.main.async() {
+                        MainActor.run {
                             UserData.shared.notes.append(note)
                         }
                     }
@@ -200,7 +200,7 @@ Let's add 3 methods to call our API: a method to query the Note, a method to cre
                 case .failure(let error):
                     print("Can not retrieve result : error  \(error.errorDescription)")
                 }
-            case .failure(let error):
+            } catch {
                 print("Can not retrieve Notes : error \(error)")
             }
         }
@@ -208,18 +208,19 @@ Let's add 3 methods to call our API: a method to query the Note, a method to cre
 
     func createNote(note: Note) {
 
-        // use note.data to access the NoteData instance
-        Amplify.API.mutate(request: .create(note.data)) { event in
-            switch event {
-            case .success(let result):
+        Task {
+            do {
+                // use note.data to access the NoteData instance
+                let result = try await Amplify.API.mutate(request: .create(note.data))
                 switch result {
-                case .success(let data):
-                    print("Successfully created note: \(data)")
-                case .failure(let error):
-                    print("Got failed result with \(error.errorDescription)")
+                    case .success(let data):
+                        print("Successfully created note: \(data)")
+                    case .failure(let error):
+                        print("Got failed result with \(error.errorDescription)")
+                    } 
                 }
-            case .failure(let error):
-                print("Got failed event with error \(error)")
+            } catch {
+                print("Got failed result with error \(error)")
             }
         }
     }
@@ -227,17 +228,17 @@ Let's add 3 methods to call our API: a method to query the Note, a method to cre
     func deleteNote(note: Note) {
 
         // use note.data to access the NoteData instance
-        Amplify.API.mutate(request: .delete(note.data)) { event in
-            switch event {
-            case .success(let result):
+        Task {
+            do {
+                let result = try await Amplify.API.mutate(request: .delete(note.data))
                 switch result {
                 case .success(let data):
                     print("Successfully deleted note: \(data)")
                 case .failure(let error):
                     print("Got failed result with \(error.errorDescription)")
                 }
-            case .failure(let error):
-                print("Got failed event with error \(error)")
+            } catch {
+                print("Got failed result with error \(error)")
             }
         }
     }
@@ -248,18 +249,15 @@ Finally, we must call the API to query the list of `Note` for the currently sign
 ```swift
 // inside private init() method
 // let's check if user is signedIn or not
-Amplify.Auth.fetchAuthSession { (result) in
-
+Task {
     do {
-        let session = try result.get()
+        let session = try await Amplify.Auth.fetchAuthSession()
 
         // let's update UserData and the UI
-        self.updateUserData(withSignInStatus: session.isSignedIn)
-
+        await self.updateUserData(withSignInStatus: session.isSignedIn)
     } catch {
         print("Fetch auth session failed with error - \(error)")
     }
-
 }
 ````
 
@@ -267,8 +265,8 @@ In the same `Backend.swift`file, update the `updateUserData(withSignInStatus:)` 
 
 ```swift
 // change our internal state, this triggers an UI update on the main thread
-func updateUserData(withSignInStatus status : Bool) {
-    DispatchQueue.main.async() {
+func updateUserData(withSignInStatus status : Bool) async {
+    await MainActor.run {
         let userData : UserData = .shared
         userData.isSignedIn = status
 
@@ -349,7 +347,7 @@ In Xcode, open `ContentView.swift`
 
     Back to `ContentView` struct, **replace** `.navigationBarItems(leading: SignOutButton())` with
 
-    ```Swift
+    ```swift
         .navigationBarItems(leading: SignOutButton(),
                             trailing: Button(action: {
             self.showCreateNote.toggle()

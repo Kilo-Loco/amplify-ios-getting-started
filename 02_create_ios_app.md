@@ -34,19 +34,9 @@ Finally, select a directory and click **Create** to create the project.
 
 ## Update the Main View
 
-From the file list on the left of Xcode, open `ContentView.swift` and replace the code with this content:
-
+Create a new file by clicking the plus (**+**) at the bottom of the navigation pane (**&#8984;N**), name it `Note.swift`, and add the following content:
 ```swift
 import SwiftUI
-
-// singleton object to store user data
-class UserData : ObservableObject {
-    private init() {}
-    static let shared = UserData()
-
-    @Published var notes : [Note] = []
-    @Published var isSignedIn : Bool = false
-}
 
 // the data class to represents Notes
 class Note : Identifiable, ObservableObject {
@@ -63,6 +53,47 @@ class Note : Identifiable, ObservableObject {
         self.imageName = image
     }
 }
+```
+
+In the snippet above, I created a `Note` class to store the data of Notes. I used two distinct properties for `ImageName` and `Image`. I will take care of `Image` later on in section [06 Add Storage](o6_add_storage.md)
+
+Next, create another file named `UserData.swift` and add the following:
+
+```swift
+// singleton object to store user data
+class UserData : ObservableObject {
+    private init() {}
+    static let shared = UserData()
+
+    @Published var notes : [Note] = []
+    @Published var isSignedIn : Bool = false
+}
+
+// this is a test data set to preview the UI in Xcode
+@discardableResult
+func prepareTestData() -> UserData {
+    let userData = UserData.shared
+    userData.isSignedIn = true
+    let desc = "this is a very long description that should fit on multiiple lines.\nit even has a line break\nor two."
+
+    let n1 = Note(id: "01", name: "Hello world", description: desc, image: "mic")
+    let n2 = Note(id: "02", name: "A new note", description: desc, image: "phone")
+
+    n1.image = Image(systemName: n1.imageName!)
+    n2.image = Image(systemName: n2.imageName!)
+
+    userData.notes = [ n1, n2 ]
+
+    return userData
+}
+```
+
+Here, I created a `UserData` class to hold specific user's data, at this stage, just a list of `Note` objects. The `prepareTestData` function is will be used to keep the SwiftUI previews working as the UI continues to get updated.
+
+From the file list on the left of Xcode, open `ContentView.swift` and replace the code with this content:
+
+```swift
+import SwiftUI
 
 // a view to represent a single list item
 struct ListRow: View {
@@ -114,34 +145,11 @@ struct ContentView_Previews: PreviewProvider {
         return ContentView()
     }
 }
-
-// this is a test data set to preview the UI in Xcode
-@discardableResult
-func prepareTestData() -> UserData {
-    let userData = UserData.shared
-    userData.isSignedIn = true
-    let desc = "this is a very long description that should fit on multiiple lines.\nit even has a line break\nor two."
-
-    let n1 = Note(id: "01", name: "Hello world", description: desc, image: "mic")
-    let n2 = Note(id: "02", name: "A new note", description: desc, image: "phone")
-
-    n1.image = Image(systemName: n1.imageName!)
-    n2.image = Image(systemName: n2.imageName!)
-
-    userData.notes = [ n1, n2 ]
-
-    return userData
-}
-
 ```
 
-### What did we just add?
-
-- I created a `Note` class to store the data of Notes. I used two distinct properties for `ImageName` and `Image`. I will take care of `Image` later on in section [06 Add Storage](o6_add_storage.md)
-- I created a `UserData` class to hold specific user's data, at this stage, just a list of `Note` objects.
-- the main view `ContentView` contains a `List` of `ListRow`s
+- The main view `ContentView` contains a `List` of `ListRow`s
 - Each line is rendered by a `ListRow` : a horizontal stack with an image and text.  Text is a vertical stack with the note name, in bold, and the note description.
-- Finally I adjusted `ContentView_Previews` and added `prepareTestData()` to allow a preview rendering in the canvas.
+- Finally, I adjusted `ContentView_Previews` and added `prepareTestData()` to allow a preview rendering in the canvas.
 
 ## Build and Test
 

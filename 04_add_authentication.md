@@ -4,7 +4,7 @@ The next feature you will be adding is user authentication. In this module, you 
 
 You will also learn how to use the Cognito Hosted User Interface to present an entire user authentication flow, allowing users to sign up, sign in, and reset their password with just few lines of code.
 
-using a "Hosted User Interface" means the application leverages the Cognito web pages for the signin and signup user interface flows. The user of the app is redirected to a web page hosted by Cognito and redirected back to the app after signin.  Of course, Cognito and Amplify does support native UI as well, you can follow [these workshop instructions](https://amplify-ios-workshop.go-aws.com/70_add_custom_gui/30_customized_ui.html) to learn more about custom authentication UI.
+Using a "Hosted User Interface" means the application leverages the Cognito web pages for the signin and signup user interface flows. The user of the app is redirected to a web page hosted by Cognito and redirected back to the app after signin.  Of course, Cognito and Amplify does support native UI as well, you can follow [these workshop instructions](https://amplify-ios-workshop.go-aws.com/70_add_custom_gui/30_customized_ui.html) to learn more about custom authentication UI.
 
 ## What you Will Learn
 
@@ -66,7 +66,7 @@ Test Your Hosted UI Endpoint: https://iosgettingstarted-dev.auth.eu-central-1.am
 
 ## Add Amplify Authentication Library to the Project
 
-Before going to the code, you add the Amplify Authentication Library to the dependencies of your project.  Navigate to the **General** tab of your Target application (Your Project > Targets > General) and click the plus (+) in the **Frameworks, Libraries, and Embedded Content** section:
+Before going to the code, you add the Amplify Authentication Library to the dependencies of your project.  Navigate to the **General** tab of your Target application (Your Project > Targets > General) and click the plus (**+**) in the **Frameworks, Libraries, and Embedded Content** section:
 
 ![Targets General Tab](img/navigate-to-targets-general-tab.png)
 
@@ -83,7 +83,7 @@ You will now see **AWSCognitoAuthPlugin** as a dependency for your project:
 Back to Xcode, open `Backend.swift` file.  In the `Backend` class,
 
 - **add** an `import` statement for the `AmplifyPlugins`
-- **add a line** to the amplify initialization code we added in the previous section.
+- **add a line** to the Amplify initialization code we added in the previous section.
 
 Complete code block should look like this:
 
@@ -119,34 +119,54 @@ The remaining code change tracks the status of user (are they signed in or not?)
     // MARK: - User Authentication
 
     // signin with Cognito web user interface
-    public func signIn() {
-
-        Amplify.Auth.signInWithWebUI(presentationAnchor: UIApplication.shared.windows.first!) { result in
-            switch result {
-            case .success(_):
+    public func signIn() async {
+        do {
+            let signInResult = Amplify.Auth.signInWithWebUI(presentationAnchor: UIApplication.shared.windows.first!)
+            if signInResult.isSignedIn {
                 print("Sign in succeeded")
-            case .failure(let error):
-                print("Sign in failed \(error)")
             }
+        } catch let error as AuthError {
+            print("Sign in failed \(error)")
+        } catch {
+            print("Unexpected error: \(error)")
         }
     }
 
     // signout
-    public func signOut() {
+    public func signOut() async {
+        let result = await Amplify.Auth.signOut()
+        guard let signOutResult = result as? AWSCognitoSignOutResult
+        else {
+            print("Signout failed")
+            return
+        }
 
-        Amplify.Auth.signOut() { (result) in
-            switch result {
-            case .success:
-                print("Successfully signed out")
-            case .failure(let error):
-                print("Sign out failed with error \(error)")
+        switch signOutResult {
+        case .complete:
+        print("Successfully signed out")
+
+        case let .partial(revokeTokenError, globalSignOutError, hostedUIError):
+            if let hostedUIError = hostedUIError {
+                print("HostedUI error  \(String(describing: hostedUIError))
             }
+
+            if let globalSignOutError = globalSignOutError {
+                print("GlobalSignOut error  \(String(describing: globalSignOutError))
+            }
+
+            if let revokeTokenError = revokeTokenError {
+                print("Revoke token error  \(String(describing: revokeTokenError))
+            }
+
+        case .failed(let error):
+            // Sign Out failed with an exception, leaving the user signed in.
+            print("SignOut failed with \(error)")
         }
     }
 
     // change our internal state, this triggers an UI update on the main thread
-    func updateUserData(withSignInStatus status : Bool) {
-        DispatchQueue.main.async() {
+    func updateUserData(withSignInStatus status : Bool) async {
+        await MainActor.run {
             let userData : UserData = .shared
             userData.isSignedIn = status
         }
@@ -166,7 +186,7 @@ The remaining code change tracks the status of user (are they signed in or not?)
     ```Swift
     // in private init() function
     // listen to auth events.
-    // see https://github.com/aws-amplify/amplify-ios/blob/master/Amplify/Categories/Auth/Models/AuthEventName.swift
+    // see https://github.com/aws-amplify/amplify-swift/blob/main/Amplify/Categories/Auth/Models/AuthEventName.swift
     _ = Amplify.Hub.listen(to: .auth) { (payload) in
 
         switch payload.eventName {
@@ -189,20 +209,16 @@ The remaining code change tracks the status of user (are they signed in or not?)
         }
     }
 
-        // let's check if user is signedIn or not
-        Amplify.Auth.fetchAuthSession { (result) in
+    Task {
+        do {
+            let session = try await Amplify.Auth.fetchAuthSession()
 
-            do {
-                let session = try result.get()
-                
-                // let's update UserData and the UI
-                self.updateUserData(withSignInStatus: session.isSignedIn)
-                
-            } catch {
-                print("Fetch auth session failed with error - \(error)")
-            }
-
-        }    
+            // let's update UserData and the UI
+            await self.updateUserData(withSignInStatus: session.isSignedIn)
+        } catch {
+            print("Fetch auth session failed with error - \(error)")
+        }
+    }
     ```
 
 3. Update the User Interface code
@@ -237,27 +253,35 @@ The remaining code change tracks the status of user (are they signed in or not?)
     ```swift
     struct SignInButton: View {
         var body: some View {
-            Button(action: { Backend.shared.signIn() }){
-                HStack {
-                    Image(systemName: "person.fill")
-                        .scaleEffect(1.5)
-                        .padding()
-                    Text("Sign In")
-                        .font(.largeTitle)
+            Button(
+                action: { 
+                    Task { await Backend.shared.signIn() }
+                },
+                label: {
+                    HStack {
+                        Image(systemName: "person.fill")
+                            .scaleEffect(1.5)
+                            .padding()
+                        Text("Sign In")
+                            .font(.largeTitle)
+                    }
+                    .padding()
+                    .foregroundColor(.white)
+                    .background(Color.green)
+                    .cornerRadius(30)
                 }
-                .padding()
-                .foregroundColor(.white)
-                .background(Color.green)
-                .cornerRadius(30)
-            }
+            )
         }
     }
 
     struct SignOutButton : View {
         var body: some View {
-            Button(action: { Backend.shared.signOut() }) {
-                    Text("Sign Out")
-            }
+            Button(
+                action: {
+                    Task { await Backend.shared.signOut() }
+                },
+                label: { Text("Sign Out") }
+            )
         }
     }
     ```

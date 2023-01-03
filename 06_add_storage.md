@@ -89,50 +89,56 @@ Open `Backend.swift`. Anywhere in the `Backend` class, **add** the the following
 func storeImage(name: String, image: Data) {
 
     let options = StorageUploadDataRequest.Options(accessLevel: .private)
-    Amplify.Storage.uploadData(key: name, data: image, options: options,
-        progressListener: { progress in
+    let uploadTask = Amplify.Storage.uploadData(
+        key: name, 
+        data: image, 
+        options: options
+    )
+    Task {
+        for await progress in await uploadTask.progress {
             // optionally update a progress bar here
-        }, resultListener: { event in
-            switch event {
-            case .success(let data):
-                print("Image upload completed: \(data)")
-            case .failure(let storageError):
-                print("Image upload failed: \(storageError.errorDescription). \(storageError.recoverySuggestion)")
         }
-    })
+        do {
+            let data = try await uploadTask.value
+            print("Image upload completed: \(data)")
+        } catch {
+            print("Image upload failed: \(error.errorDescription). \(error.recoverySuggestion)")
+        }
+    }
 }
 
 func retrieveImage(name: String, completed: @escaping (Data) -> Void) {
 
     let options = StorageDownloadDataRequest.Options(accessLevel: .private)
-    Amplify.Storage.downloadData(key: name, options: options,
-        progressListener: { progress in
-            // in case you want to monitor progress
-        }, resultListener: { (event) in
-            switch event {
-            case let .success(data):
-                print("Image \(name) loaded")
-                completed(data)
-            case let .failure(storageError):
-                print("Can not download image: \(storageError.errorDescription). \(storageError.recoverySuggestion)")
-            }
-        }
+    let downloadTask = Amplify.Storage.downloadData(
+        key: name, 
+        options: options
     )
+    Task {
+        for await progress in await downloadTask.progress {
+            // optionally update a progress bar here
+        }
+        do {
+            let data = try await downloadTask.value
+            print("Image \(name) loaded")
+            completed(data)
+        } catch {
+            print("Can not download image: \(error.errorDescription). \(error.recoverySuggestion)")
+        }
+    }
 }
 
 func deleteImage(name: String) {
 
     let options = StorageRemoveRequest.Options(accessLevel: .private)
-    Amplify.Storage.remove(key: name, options: options,
-        resultListener: { (event) in
-            switch event {
-            case let .success(data):
-                print("Image \(data) deleted")
-            case let .failure(storageError):
-                print("Can not delete image: \(storageError.errorDescription). \(storageError.recoverySuggestion)")
-            }
+    Task {
+        do {
+            let key = try await Amplify.Storage.remove(key: name, options: options)
+            print("Image \(key) deleted")
+        } catch {
+            print("Can not delete image: \(error.errorDescription). \(error.recoverySuggestion)")
         }
-    )
+    }
 }
 ```
 
@@ -162,7 +168,7 @@ convenience init(from data: NoteData) {
         // asynchronously download the image
         Backend.shared.retrieveImage(name: name) { (data) in
             // update the UI on the main thread
-            DispatchQueue.main.async() {
+            MainActor.run {
                 let uim = UIImage(data: data)
                 self.image = Image(uiImage: uim!)
             }
@@ -173,7 +179,7 @@ convenience init(from data: NoteData) {
 }
 ```
 
-When an image name is present in the instance of `Note`, the code calls `retrieveImage`. This is an asynchronous function. It takes a function to call when the image is downloaded. The function creates an `Image` UI object and assign it to the instance of `Note`. Notice that this assignment triggers a User Interface update, hence it happens on the main thread of the application `DispatchQueue.main.async`.
+When an image name is present in the instance of `Note`, the code calls `retrieveImage`. This is an asynchronous function. It takes a function to call when the image is downloaded. The function creates an `Image` UI object and assign it to the instance of `Note`. Notice that this assignment triggers a User Interface update, hence it happens on the main thread of the application `MainActor.run`.
 
 ## Add UI Code to Capture an Image
 
